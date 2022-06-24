@@ -50,3 +50,16 @@ AF types are mapped to SMIP types as follows:
 - GUID - string
 - DateTime - DateTime
 
+## Approach
+  
+We decided to use browser scripts for this work for the following reasons:
+  
+### In and Out of PI AF using XML
+  
+PI AF has had robust import and export methods utilizing XML files for decades. One can simply righ-click an Element Template and export to file. Or export all Element Templates. Or export a whole model, or portions of a model, including the referenced types. There are many ways to export from PI AF and the user should be aware of what data will be contained in an XML file. This repository includes a number of different sample XML files to illustrate this.
+  
+We chose to parse XML using javascript in the browser over PHP, Python, or .NET Core in a server setting simply because HTML is XML and javascript does a superb job handling XML. We are not concerened about loading too large a model into the browser: modern browsers can handle large files, and simple XML exports of Element Template libraries from PI AF should rarely exceed 10MB.
+  
+### Interoperability with SMIP using the GraphQL API
+  
+The SMIP's script engine allows the creation of browser scripts uing modern web development techniques. We use a standard set of patterns that allow us to access the SMIP model using the GraphQL API and bind data to the UI using Vue.js. Browser scripts act "on behalf of the user", that means that a SMIP user has to bring sufficient GraphQL priviledges to modify the model, i.e. create equipment types.

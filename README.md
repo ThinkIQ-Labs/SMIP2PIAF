@@ -1,12 +1,11 @@
 # SMIP2PIAF
 
-This project includes a collection of browser scripts that allows the import of Asset Framework (AF) Element Types from AVEVA's PI System Explorer (PI AF) into the SMIP. Reverse functionality, i.e. exporting SMIP types so they can be imported into PI AF is supported also. Below is a screenshot of how Element Types can be imported into the SMIP:
+This project includes a collection of browser scripts that allow the import of Asset Framework (AF) Element Types from AVEVA's PI System Explorer (PI AF) into the SMIP. Reverse functionality, i.e. exporting SMIP types so they can be imported into PI AF is supported also. Below is a screenshot of how Element Types can be imported into the SMIP:
 
 ![Screenshot](./images/ImportTypesScreenshot.png)
 <p align = "center"><b>Fig.1 - Screenshot of UI to import Element Types</b></p>
 
-
-To load this tool into a SMIP, simply import the library saved in this repo's release section.
+To load this set of tools into a SMIP, simply import the library saved in this repo's release section.
 
 ![Screenshot](./images/ImportLibrary.png)
 <p align = "center"><b>Fig.2 - Import Library to Load Smart App into SMIP</b></p>

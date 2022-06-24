@@ -1,19 +1,27 @@
 <?php
-use Joomla\CMS\HTML\HTMLHelper;
-HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.core.js', array('version' => 'auto', 'relative' => false));
-HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array('version' => 'auto', 'relative' => false));
+    
+    use Joomla\CMS\HTML\HTMLHelper;
+    HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.core.js', array('version' => 'auto', 'relative' => false));
+    HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array('version' => 'auto', 'relative' => false));
+    
+    require_once 'thinkiq_context.php';
+    $context = new Context();
 ?>
+
+<script>
+    document.title='Import Equipment Types from AVEVA AF';
+</script>
 
 <div id="app">
 
     <div class="row">            
         <div class="col-12">
-            <h1 class="pb-2 text-center">Import Equipment Types from AVEVA AF</h1>
+            <h1 class="pb-2 pt-2 text-center">{{pageTitle}}</h1>
             <p class="pb-4 text-center">
-                <a href="https://services.dev.thinkiq.net/index.php?option=com_modeleditor&view=script&id=21425615" target="_blank">source</a>
+                <a v-bind:href="`index.php?option=com_modeleditor&view=script&id=${context.std_inputs.script_id}`" target="_blank">source</a>
             </p>
-        </div>            
-    </div> 
+        </div>   
+    </div>
 
     <div class="row">
 
@@ -89,12 +97,12 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
 
 <script>
 
-    window.document.title="Import Equipment Types from AVEVA AF";
-
     var app = new core.Vue({
         el: "#app",
         data(){
             return {
+                pageTitle: "Import Equipment Types from AVEVA AF",
+                context:<?php echo json_encode($context)?>,
                 afElementTemplates:[],
                 activeTemplate:null,
                 activeAttribute:null,

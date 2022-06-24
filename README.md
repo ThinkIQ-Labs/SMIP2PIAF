@@ -62,4 +62,5 @@ We chose to parse XML using javascript in the browser over PHP, Python, or .NET 
   
 ### Interoperability with SMIP using the GraphQL API
   
-The SMIP's script engine allows the creation of browser scripts uing modern web development techniques. We use a standard set of patterns that allow us to access the SMIP model using the GraphQL API and bind data to the UI using Vue.js. Browser scripts act "on behalf of the user", that means that a SMIP user has to bring sufficient GraphQL priviledges to modify the model, i.e. create equipment types.
+The SMIP's script engine allows the creation of browser scripts uing modern web development techniques. We use a standard set of patterns that allow us to access the SMIP model using the GraphQL API and bind data to the UI using Vue.js. 
+It is important to note that browser scripts act "on behalf of the user", that means that a SMIP user has to bring sufficient GraphQL priviledges to modify the model, i.e. create equipment types.

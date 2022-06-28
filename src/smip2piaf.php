@@ -1,19 +1,27 @@
 <?php
-use Joomla\CMS\HTML\HTMLHelper;
-HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.core.js', array('version' => 'auto', 'relative' => false));
-HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array('version' => 'auto', 'relative' => false));
+    
+    use Joomla\CMS\HTML\HTMLHelper;
+    HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.core.js', array('version' => 'auto', 'relative' => false));
+    HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array('version' => 'auto', 'relative' => false));
+    
+    require_once 'thinkiq_context.php';
+    $context = new Context();
 ?>
+
+<script>
+    document.title='Import Equipment Types from AVEVA AF';
+</script>
 
 <div id="app">
 
     <div class="row">            
         <div class="col-12">
-            <h1 class="pb-2 text-center">Import Equipment Types from AVEVA AF</h1>
+            <h1 class="pb-2 pt-2 text-center">{{pageTitle}}</h1>
             <p class="pb-4 text-center">
-                <a href="https://services.dev.thinkiq.net/index.php?option=com_modeleditor&view=script&id=21425615" target="_blank">source</a>
+                <a v-bind:href="`index.php?option=com_modeleditor&view=script&id=${context.std_inputs.script_id}`" target="_blank">source</a>
             </p>
-        </div>            
-    </div> 
+        </div>   
+    </div>
 
     <div class="row">
 
@@ -32,7 +40,7 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
                             {{aAfElementTemplate.name}}
                             <a 
                                 :href="`?option=com_modeleditor&view=modeleditor&view_mode=flat&EqptTypeGrid_display_name=${encodeURIComponent(aAfElementTemplate.existingTypeDisplayName)}#EqptTypeGriddiv`" 
-                                v-if="aAfElementTemplate.exists" target="_blank"
+                                v-if="aAfElementTemplate.exists" target="_blank" :style="activeTemplate==null ? '' : activeTemplate.name==aAfElementTemplate.name ? 'color:darkblue;' : ''"
                                 class="pull-right">already exists</a>
                         </button>
                     </div>
@@ -43,14 +51,15 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
             <div v-if="activeTemplate">
                 <h3>
                     Information Model
-                    <button class="btn btn-primary pull-right mb-2" :disabled="activeTemplate.exists" @click="importType">
+                    <button class="btn btn-primary pull-right mb-2" :disabled="activeTemplate.exists || templateNeedsBaseType(activeTemplate)" @click="importType">
                         Import Type
                     </button>
                 </h3>
                 <div class="card mt-3" style="max-height: 60rem;">
                     <div class="card-body">
                         <div class="card-title">
-                            Name: {{activeTemplate.name}}
+                            Name: {{activeTemplate.name}}<br/>
+                            BaseType: {{activeTemplate.baseTemplateName==null ? 'n/a' : activeTemplate.baseTemplateName}}
                         </div>
                         <div class="card-text">
                             Description: {{activeTemplate.nodes.find(x=>x.tagName=='Description').textContent}}</br>
@@ -89,22 +98,32 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
 
 <script>
 
-    window.document.title="Import Equipment Types from AVEVA AF";
-
     var app = new core.Vue({
         el: "#app",
         data(){
             return {
+                pageTitle: "Import Equipment Types from AVEVA AF",
+                context:<?php echo json_encode($context)?>,
                 afElementTemplates:[],
                 activeTemplate:null,
                 activeAttribute:null,
-                existingEquipmentTypes:[]
+                existingEquipmentTypes:[],
+                existingUoms:[]
             }
         },
         mounted: async function(){
             await this.loadEquipmentTypes();
         },
         methods: {
+            templateNeedsBaseType(aTemplate){
+                if(aTemplate.baseTemplateName==null){
+                    return false;
+                } else if(this.existingEquipmentTypes.find(x=>x.displayName==aTemplate.baseTemplateName)==null){
+                    return true;
+                } else {
+                    return false;
+                }
+            },
             getTextContentByTagName: function(nodeList, tagName){
                 let returnValue = "";
                 let aNode = nodeList.find(x=>x.tagName==tagName);
@@ -115,10 +134,18 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
             },
             importType: async function(){
                 // create type
+                let baseTypeId = null;
+                if(this.activeTemplate.baseTemplateName!=null){
+                    baseTypeId = this.existingEquipmentTypes.find(x=>x.displayName==this.activeTemplate.baseTemplateName).id;
+                }
                 let createEquipmentTypeQuery = `mutation m1{
                     createEquipmentType(
                         input: {
-                          equipmentType: { displayName: "${this.activeTemplate.name}", description: "${this.activeTemplate.nodes.find(x=>x.tagName=='Description').textContent}" }
+                          equipmentType: { 
+                                displayName: "${this.activeTemplate.name}", 
+                                description: "${this.activeTemplate.nodes.find(x=>x.tagName=='Description').textContent}" 
+                                ${baseTypeId == null ? '' : 'subTypeOfId: "' + baseTypeId + '"'}
+                            }
                         }
                       ) {
                         equipmentType{
@@ -142,7 +169,7 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
                         case "Boolean":
                             dataType = "BOOL";
                             defaultType = "defaultBoolValue";
-                            defaultValue= `"${aAttribute.nodes.find(x=>x.tagName=='Value').textContent}"`;
+                            defaultValue= `${aAttribute.nodes.find(x=>x.tagName=='Value').textContent == 'FALSE' ? 'false' : 'true'}`;
                             break;
                         case "String":
                             dataType = "STRING";
@@ -172,6 +199,11 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
                             break;
                     }
 
+                    let afUom = this.getTextContentByTagName(aAttribute.nodes, 'DefaultUOM');
+                    let aExistingUom = this.existingUoms.find(x=>x.symbol==afUom);
+                    let uomId = aExistingUom!=null ? aExistingUom.id : '';
+                    let quanityId = aExistingUom!=null ? aExistingUom.quantity.id : '';
+
                     let createTypeToAttributeTypeQuery = `mutation m1{
                         createTypeToAttributeType(
                             input: {
@@ -182,6 +214,8 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
                                     dataType: ${dataType}
                                     ${defaultType}: ${defaultValue}
                                     sourceCategory: ${source}
+                                    ${quanityId=='' ? '' : 'quantityId:"' + quanityId + '"'}
+                                    ${uomId=='' ? '' : 'defaultMeasurementUnitId:"' + uomId + '"'}
                                 }
                             }
                             ) {
@@ -190,7 +224,10 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
                             }
                           }
                     }`;
-                    let typeToAttributeTypeId = (await tiqGraphQL.makeRequestAsync(createTypeToAttributeTypeQuery)).data.createTypeToAttributeType.typeToAttributeType.id;
+                    // console.log(createTypeToAttributeTypeQuery);
+                    let typeToAttributeTypeResponse = await tiqGraphQL.makeRequestAsync(createTypeToAttributeTypeQuery);
+                    // console.log(typeToAttributeTypeResponse);
+                    let typeToAttributeTypeId = typeToAttributeTypeResponse.data.createTypeToAttributeType.typeToAttributeType.id;
                 });
             },
             loadEquipmentTypes: async function(){
@@ -199,9 +236,21 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
                         id
                         displayName
                     }
+                    measurementUnits {
+                        id
+                        displayName
+                        relativeName
+                        symbol
+                        quantity {
+                            id
+                            displayName
+                        }
+                    }
                 }
                 `;
-                this.existingEquipmentTypes = (await tiqGraphQL.makeRequestAsync(eqTypesQuery)).data.equipmentTypes;
+                let aResponse = await tiqGraphQL.makeRequestAsync(eqTypesQuery);
+                this.existingEquipmentTypes = aResponse.data.equipmentTypes;
+                this.existingUoms = aResponse.data.measurementUnits;
                 this.afElementTemplates.forEach(aTemplate =>{
                     let existingType = this.existingEquipmentTypes.find(x=>x.displayName.toLowerCase()==aTemplate.name.toLowerCase());
                     aTemplate.exists = existingType!=null;
@@ -223,6 +272,16 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
                     this.afElementTemplates=[];
                     afElementTemplates.forEach(aAfElementTemplate => {
                         let nodes = [...aAfElementTemplate.childNodes];
+
+                        let name = nodes.find(x=>x.tagName=='Name').textContent;
+
+                        let baseTemplate = nodes.find(x=>x.nodeName=='BaseTemplate');
+                        if(baseTemplate==null){
+                            console.log(`${name}: not based on a type`);
+                        } else {
+                            console.log(`${name}: based on ${baseTemplate.textContent}`);
+                        }
+
                         let attributeNodes = nodes.filter(x=>x.nodeName=='AFAttributeTemplate');
                         let attributes = [];
                         attributeNodes.forEach(aAttribute =>{
@@ -232,7 +291,6 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
                                 nodes: attributeNodes
                             });
                         });
-                        let name = nodes.find(x=>x.tagName=='Name').textContent;
                         
                         let existingType = this.existingEquipmentTypes.find(x=>x.displayName.toLowerCase()==name.toLowerCase());
                         let exists = existingType!=null;
@@ -241,6 +299,7 @@ HTMLHelper::_('script', 'media/com_thinkiq/js/dist/tiq.tiqGraphQL.min.js', array
 
                         this.afElementTemplates.push({
                             name: name,
+                            baseTemplateName: baseTemplate==null ? null : baseTemplate.textContent,
                             nodes: nodes,
                             attributes: attributes,
                             exists: exists,

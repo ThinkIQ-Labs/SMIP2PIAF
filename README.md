@@ -1,6 +1,6 @@
 # SMIP2PIAF
 
-This project includes a collection of browser scripts that allow the import of Asset Framework (AF) Element Types from AVEVA's PI System Explorer (PI AF) into the SMIP. Reverse functionality, i.e. exporting SMIP types so they can be imported into PI AF is supported also. Below is a screenshot of how Element Types can be imported into the SMIP:
+This project includes a collection of browser scripts that allow the import of Asset Framework (AF) Element Types from AVEVA's PI System Explorer (PI AF) into the SMIP. Reverse functionality, i.e. exporting SMIP types so they can be imported into PI AF is not yet supported, but planned. Below is a screenshot of how Element Types can be imported into the SMIP:
 
 ![Screenshot](./images/ImportTypesScreenshot.png)
 <p align = "center"><b>Fig.1 - Screenshot of UI to import Element Types</b></p>
@@ -20,7 +20,7 @@ Even though element instances can be nested, element templates can not be nested
 
 - Name - is captured.
 - Description - is captured.
-- Base Template - is captured by name (the base template needs to be imported first and be present in the SMIP).
+- Base Template - is captured (the base template needs to be imported first and be present in the SMIP).
 - Type - only Elements are considered.
 - Categories - omitted. This does not exist in the SMIP.
 - Default Attribute - omitted. This does not exist in the SMIP.

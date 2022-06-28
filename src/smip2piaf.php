@@ -40,7 +40,7 @@
                             {{aAfElementTemplate.name}}
                             <a 
                                 :href="`?option=com_modeleditor&view=modeleditor&view_mode=flat&EqptTypeGrid_display_name=${encodeURIComponent(aAfElementTemplate.existingTypeDisplayName)}#EqptTypeGriddiv`" 
-                                v-if="aAfElementTemplate.exists" target="_blank"
+                                v-if="aAfElementTemplate.exists" target="_blank" :style="activeTemplate==null ? '' : activeTemplate.name==aAfElementTemplate.name ? 'color:darkblue;' : ''"
                                 class="pull-right">already exists</a>
                         </button>
                     </div>
@@ -51,14 +51,15 @@
             <div v-if="activeTemplate">
                 <h3>
                     Information Model
-                    <button class="btn btn-primary pull-right mb-2" :disabled="activeTemplate.exists" @click="importType">
+                    <button class="btn btn-primary pull-right mb-2" :disabled="activeTemplate.exists || templateNeedsBaseType(activeTemplate)" @click="importType">
                         Import Type
                     </button>
                 </h3>
                 <div class="card mt-3" style="max-height: 60rem;">
                     <div class="card-body">
                         <div class="card-title">
-                            Name: {{activeTemplate.name}}
+                            Name: {{activeTemplate.name}}<br/>
+                            BaseType: {{activeTemplate.baseTemplateName==null ? 'n/a' : activeTemplate.baseTemplateName}}
                         </div>
                         <div class="card-text">
                             Description: {{activeTemplate.nodes.find(x=>x.tagName=='Description').textContent}}</br>
@@ -114,6 +115,15 @@
             await this.loadEquipmentTypes();
         },
         methods: {
+            templateNeedsBaseType(aTemplate){
+                if(aTemplate.baseTemplateName==null){
+                    return false;
+                } else if(this.existingEquipmentTypes.find(x=>x.displayName==aTemplate.baseTemplateName)==null){
+                    return true;
+                } else {
+                    return false;
+                }
+            },
             getTextContentByTagName: function(nodeList, tagName){
                 let returnValue = "";
                 let aNode = nodeList.find(x=>x.tagName==tagName);
@@ -124,10 +134,18 @@
             },
             importType: async function(){
                 // create type
+                let baseTypeId = null;
+                if(this.activeTemplate.baseTemplateName!=null){
+                    baseTypeId = this.existingEquipmentTypes.find(x=>x.displayName==this.activeTemplate.baseTemplateName).id;
+                }
                 let createEquipmentTypeQuery = `mutation m1{
                     createEquipmentType(
                         input: {
-                          equipmentType: { displayName: "${this.activeTemplate.name}", description: "${this.activeTemplate.nodes.find(x=>x.tagName=='Description').textContent}" }
+                          equipmentType: { 
+                                displayName: "${this.activeTemplate.name}", 
+                                description: "${this.activeTemplate.nodes.find(x=>x.tagName=='Description').textContent}" 
+                                ${baseTypeId == null ? '' : 'subTypeOfId: "' + baseTypeId + '"'}
+                            }
                         }
                       ) {
                         equipmentType{
@@ -254,6 +272,16 @@
                     this.afElementTemplates=[];
                     afElementTemplates.forEach(aAfElementTemplate => {
                         let nodes = [...aAfElementTemplate.childNodes];
+
+                        let name = nodes.find(x=>x.tagName=='Name').textContent;
+
+                        let baseTemplate = nodes.find(x=>x.nodeName=='BaseTemplate');
+                        if(baseTemplate==null){
+                            console.log(`${name}: not based on a type`);
+                        } else {
+                            console.log(`${name}: based on ${baseTemplate.textContent}`);
+                        }
+
                         let attributeNodes = nodes.filter(x=>x.nodeName=='AFAttributeTemplate');
                         let attributes = [];
                         attributeNodes.forEach(aAttribute =>{
@@ -263,7 +291,6 @@
                                 nodes: attributeNodes
                             });
                         });
-                        let name = nodes.find(x=>x.tagName=='Name').textContent;
                         
                         let existingType = this.existingEquipmentTypes.find(x=>x.displayName.toLowerCase()==name.toLowerCase());
                         let exists = existingType!=null;
@@ -272,6 +299,7 @@
 
                         this.afElementTemplates.push({
                             name: name,
+                            baseTemplateName: baseTemplate==null ? null : baseTemplate.textContent,
                             nodes: nodes,
                             attributes: attributes,
                             exists: exists,

@@ -106,7 +106,8 @@
                 afElementTemplates:[],
                 activeTemplate:null,
                 activeAttribute:null,
-                existingEquipmentTypes:[]
+                existingEquipmentTypes:[],
+                existingUoms:[]
             }
         },
         mounted: async function(){
@@ -150,7 +151,7 @@
                         case "Boolean":
                             dataType = "BOOL";
                             defaultType = "defaultBoolValue";
-                            defaultValue= `"${aAttribute.nodes.find(x=>x.tagName=='Value').textContent}"`;
+                            defaultValue= `${aAttribute.nodes.find(x=>x.tagName=='Value').textContent == 'FALSE' ? 'false' : 'true'}`;
                             break;
                         case "String":
                             dataType = "STRING";
@@ -180,6 +181,11 @@
                             break;
                     }
 
+                    let afUom = this.getTextContentByTagName(aAttribute.nodes, 'DefaultUOM');
+                    let aExistingUom = this.existingUoms.find(x=>x.symbol==afUom);
+                    let uomId = aExistingUom!=null ? aExistingUom.id : '';
+                    let quanityId = aExistingUom!=null ? aExistingUom.quantity.id : '';
+
                     let createTypeToAttributeTypeQuery = `mutation m1{
                         createTypeToAttributeType(
                             input: {
@@ -190,6 +196,8 @@
                                     dataType: ${dataType}
                                     ${defaultType}: ${defaultValue}
                                     sourceCategory: ${source}
+                                    ${quanityId=='' ? '' : 'quantityId:"' + quanityId + '"'}
+                                    ${uomId=='' ? '' : 'defaultMeasurementUnitId:"' + uomId + '"'}
                                 }
                             }
                             ) {
@@ -198,7 +206,10 @@
                             }
                           }
                     }`;
-                    let typeToAttributeTypeId = (await tiqGraphQL.makeRequestAsync(createTypeToAttributeTypeQuery)).data.createTypeToAttributeType.typeToAttributeType.id;
+                    // console.log(createTypeToAttributeTypeQuery);
+                    let typeToAttributeTypeResponse = await tiqGraphQL.makeRequestAsync(createTypeToAttributeTypeQuery);
+                    // console.log(typeToAttributeTypeResponse);
+                    let typeToAttributeTypeId = typeToAttributeTypeResponse.data.createTypeToAttributeType.typeToAttributeType.id;
                 });
             },
             loadEquipmentTypes: async function(){
@@ -207,9 +218,21 @@
                         id
                         displayName
                     }
+                    measurementUnits {
+                        id
+                        displayName
+                        relativeName
+                        symbol
+                        quantity {
+                            id
+                            displayName
+                        }
+                    }
                 }
                 `;
-                this.existingEquipmentTypes = (await tiqGraphQL.makeRequestAsync(eqTypesQuery)).data.equipmentTypes;
+                let aResponse = await tiqGraphQL.makeRequestAsync(eqTypesQuery);
+                this.existingEquipmentTypes = aResponse.data.equipmentTypes;
+                this.existingUoms = aResponse.data.measurementUnits;
                 this.afElementTemplates.forEach(aTemplate =>{
                     let existingType = this.existingEquipmentTypes.find(x=>x.displayName.toLowerCase()==aTemplate.name.toLowerCase());
                     aTemplate.exists = existingType!=null;

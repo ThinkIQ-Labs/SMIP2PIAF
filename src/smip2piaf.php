@@ -6,6 +6,32 @@
     
     require_once 'thinkiq_context.php';
     $context = new Context();
+
+    use Joomla\CMS\Response\JsonResponse; // Used for returning data to the client.
+    use GuzzleHttp\Client;
+    use GuzzleHttp\Psr7\Request;
+    use \TiqUtilities\Database\PgSQL;
+
+
+    if ($_POST['fetch_data'] == true) {
+
+        $httpClient = new Client();
+
+        $request = new Request('GET', $_POST['url']);
+        $response = $httpClient->sendAsync($request)->wait();
+        $content = json_decode($response->getBody()->getContents());
+        $script = $content->script_templates[0]->script;
+        $script4sql = str_replace("'", "''", $script);
+
+        $script_id = $context->std_inputs->script_id;
+
+        $db = new PgSQL(new \TiqConfig());
+        $query = "UPDATE model.scripts_detail s set script='$script4sql' WHERE s.id=$script_id;";
+        $result = $db->run($query)->fetch();
+
+        die(new JsonResponse($result));
+
+    } 
 ?>
 
 <script>
@@ -13,6 +39,11 @@
 </script>
 
 <div id="app">
+
+    <div class="alert alert-info">
+        Update Alert: You're running {{gitContext.release}} - you should update to {{updateToVersion}}.
+        <button @click="updateNow" class="btn btn-secondary btn-sm pull-right mb-2">Update Now</button>
+    </div>
 
     <div class="row">            
         <div class="col-12">
@@ -104,6 +135,14 @@
             return {
                 pageTitle: "Import Equipment Types from AVEVA AF",
                 context:<?php echo json_encode($context)?>,
+                gitContext:{
+                    org: 'ThinkIQ-Labs',
+                    repo: 'SMIP2PIAF',
+                    release: 'v0.3.0-alpha'
+                },
+                offerUpdate: false,
+                updateUrl: '',
+                updateToVersion: '',
                 afElementTemplates:[],
                 activeTemplate:null,
                 activeAttribute:null,
@@ -112,9 +151,43 @@
             }
         },
         mounted: async function(){
+            await this.checkGitVersion();
             await this.loadEquipmentTypes();
         },
         methods: {
+            checkGitVersion: async function(){
+                let aResponse = await fetch(`https://api.github.com/repos/${this.gitContext.org}/${this.gitContext.repo}/releases`);
+                let releases = await aResponse.json();
+                if(releases[0].name==this.gitContext.release){
+                    console.log(`Running version ${this.gitContext.release} - you're up to date.`);
+                } else {
+                    console.log(`Running version ${this.gitContext.release} - you should update to version ${releases[0].name}.`);
+                    this.offerUpdate = true;
+                    this.updateToVersion = releases[0].name;
+
+                    let assetsResponse = await fetch(releases[0].assets_url);
+                    let assets = await assetsResponse.json();
+                    this.updateUrl = assets[0].browser_download_url;
+
+                }
+            },
+            updateNow: async function(){
+                const apiRoute = 'index.php?option=com_thinkiq&task=invokeScript';
+                let settings = { method: 'POST', headers: {} };
+                let formData = new FormData();
+                formData.append('script_name', this.context.std_inputs.script_name + '.php');
+                formData.append('script_id', this.context.std_inputs.script_id);
+                formData.append('output_type', 1);
+                formData.append('fetch_data', true);
+                formData.append('url', this.updateUrl);
+
+                settings.body = formData;
+
+                let response = await fetch(apiRoute, settings);
+                const responseData = await response.json();
+
+                console.log(responseData.data);
+            },
             templateNeedsBaseType(aTemplate){
                 if(aTemplate.baseTemplateName==null){
                     return false;

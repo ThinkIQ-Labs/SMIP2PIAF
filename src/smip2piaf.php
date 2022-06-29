@@ -28,7 +28,9 @@
         $db = new PgSQL(new \TiqConfig());
         $query = "UPDATE model.scripts_detail s set script='$script4sql' WHERE s.id=$script_id;";
         $result = $db->run($query)->fetch();
-
+        
+        header("Refresh:0");
+        
         die(new JsonResponse($result));
 
     } 
@@ -40,7 +42,7 @@
 
 <div id="app">
 
-    <div class="alert alert-info">
+    <div class="alert alert-info" v-if="offerUpdate">
         Update Alert: You're running {{gitContext.release}} - you should update to {{updateToVersion}}.
         <button @click="updateNow" class="btn btn-secondary btn-sm pull-right mb-2">Update Now</button>
     </div>

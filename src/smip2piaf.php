@@ -6,13 +6,46 @@
     
     require_once 'thinkiq_context.php';
     $context = new Context();
+
+    use Joomla\CMS\Response\JsonResponse; // Used for returning data to the client.
+    use GuzzleHttp\Client;
+    use GuzzleHttp\Psr7\Request;
+    use \TiqUtilities\Database\PgSQL;
+
+
+    if ($_POST['fetch_data'] == true) {
+
+        $httpClient = new Client();
+
+        $request = new Request('GET', $_POST['url']);
+        $response = $httpClient->sendAsync($request)->wait();
+        $content = json_decode($response->getBody()->getContents());
+        $script = $content->script_templates[0]->script;
+        $script4sql = str_replace("'", "''", $script);
+
+        $script_id = $context->std_inputs->script_id;
+
+        $db = new PgSQL(new \TiqConfig());
+        $query = "UPDATE model.scripts_detail s set script='$script4sql' WHERE s.id=$script_id;";
+        $result = $db->run($query)->fetch();
+        
+        header("Refresh:0");
+        
+        die(new JsonResponse($result));
+
+    } 
 ?>
 
 <script>
-    document.title='Import Equipment Types from AVEVA AF';
+    document.title='AF Equipment Types I/O';
 </script>
 
 <div id="app">
+
+    <div class="alert alert-info" v-if="offerUpdate">
+        Update Alert: You're running {{gitContext.release}} - you should update to {{updateToVersion}}.
+        <button @click="updateNow" class="btn btn-secondary btn-sm pull-right mb-2">Update Now</button>
+    </div>
 
     <div class="row">            
         <div class="col-12">
@@ -25,9 +58,12 @@
 
     <div class="row">
 
-        <div class="col-3">
-            <h3>Load XML File</h3>
+        <div v-if="isImportMode" class="col-3">
+            <button class="btn btn-light btn-sm" @click="activeTemplate=null; isImportMode=false;">Switch to Export</button>
             <div class="card mt-3" style="max-height: 60rem;">
+                <div class="card-header">
+                    <h3>Import Types from XML</h3>
+                </div>
                 <div class="card-body">
                     <div class="card-title">
                         <label class="text-reader">
@@ -47,35 +83,60 @@
                 </div>
             </div>
         </div>
+
+        <div v-if="!isImportMode" class="col-3">
+            <button class="btn btn-light btn-sm" @click="activeTemplate=null; isImportMode=true;">Switch to Import</button>
+
+            <div class="card mt-3" style="max-height: 60rem;">
+                <div class="card-header">
+                    <h3>Select Types to Export<button class="btn btn-primary btn-sm pull-right mt-1">Create XML</button></h3>
+                </div>
+                <div class="card-body">
+                    <div class="list-group" style="max-height: 54rem; overflow-y:auto;">
+                        <button :ref="`type_${aEquipmentType.id}`" v-for="aEquipmentType in existingEquipmentTypes" class="list-group-item list-group-item-action" v-bind:class="{ active: activeTemplate==null ? false : activeTemplate.displayName==aEquipmentType.displayName }" @click="()=>{activeAttribute=null; activeTemplate=aEquipmentType;}">
+                            {{aEquipmentType.displayName}}<input type="checkbox" v-model="aEquipmentType.isChecked" class="mr-3 pull-right"/>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="col-6">
             <div v-if="activeTemplate">
                 <h3>
                     Information Model
-                    <button class="btn btn-primary pull-right mb-2" :disabled="activeTemplate.exists || templateNeedsBaseType(activeTemplate)" @click="importType">
+                    <button v-if="isImportMode" class="btn btn-primary pull-right mb-2" :disabled="activeTemplate.exists || templateNeedsBaseType(activeTemplate)" @click="importType">
                         Import Type
                     </button>
                 </h3>
                 <div class="card mt-3" style="max-height: 60rem;">
                     <div class="card-body">
                         <div class="card-title">
-                            Name: {{activeTemplate.name}}<br/>
-                            BaseType: {{activeTemplate.baseTemplateName==null ? 'n/a' : activeTemplate.baseTemplateName}}
+                            Name: {{isImportMode ? activeTemplate.name : activeTemplate.displayName}}<br/>
+                            BaseType: {{isImportMode ? (activeTemplate.baseTemplateName==null ? 'n/a' : activeTemplate.baseTemplateName) : (activeTemplate.subTypeOf==null ? 'n/a' : activeTemplate.subTypeOf.displayName)}}
+                            <button v-if="!isImportMode && activeTemplate.subTypeOf!=null" class="btn btn-light btn-sm ml-4"
+                                    @click="jumpToType">select</button>
                         </div>
                         <div class="card-text">
-                            Description: {{activeTemplate.nodes.find(x=>x.tagName=='Description').textContent}}</br>
+                            Description: {{isImportMode ? activeTemplate.nodes.find(x=>x.tagName=='Description').textContent : activeTemplate.description}}</br>
                             <div class="row">
                                 <div class="col-4">
                                     </br>
                                     Attributes:</br>
-                                    <div class="list-group" style="max-height: 51rem; overflow-y:auto;">
-                                        <button v-for="aAfAttribute in activeTemplate.attributes" 
+                                    <div class="list-group" style="max-height: 49rem; overflow-y:auto;">
+                                        <button v-if="isImportMode" v-for="aAfAttribute in activeTemplate.attributes" 
                                             class="list-group-item list-group-item-action" 
                                             v-bind:class="{ active: activeAttribute==null ? false : activeAttribute.name == aAfAttribute.name}" @click="()=>{activeAttribute=aAfAttribute;}">
                                             {{aAfAttribute.name}}
                                         </button>
+                                        <button v-if="!isImportMode" v-for="aAttribute in activeTemplate.typeToAttributeTypes" 
+                                            class="list-group-item list-group-item-action" 
+                                            v-bind:class="{ active: activeAttribute==null ? false : activeAttribute.displayName == aAttribute.displayName}" @click="()=>{activeAttribute=aAttribute;}">
+                                            {{aAttribute.displayName}}
+                                        </button>
                                     </div>
                                 </div>
-                                <div class="col-8">
+                                <div v-if="isImportMode" class="col-8">
                                     <div v-if="activeAttribute">
                                         </br>
                                         Attribute Settings:</br></br>
@@ -84,6 +145,17 @@
                                         Data Type: {{activeAttribute.nodes.find(x=>x.tagName=='Type')?.textContent}}</br>
                                         UoM: {{activeAttribute.nodes.find(x=>x.tagName=='DefaultUOM')?.textContent}}</br>
                                         Ref: {{activeAttribute.nodes.find(x=>x.tagName=='DataReference')?.textContent}}</br>
+                                    </div>
+                                </div>
+                                <div v-if="!isImportMode" class="col-8">
+                                    <div v-if="activeAttribute">
+                                        </br>
+                                        Attribute Settings:</br></br>
+                                        Name: {{activeAttribute.displayName}}</br>
+                                        Description: {{activeAttribute.description}}</br>
+                                        Data Type: {{activeAttribute.dataType}}</br>
+                                        UoM: {{activeAttribute.defaultMeasurementUnit == null ? 'n/a' : activeAttribute.defaultMeasurementUnit.symbol}}</br>
+                                        Ref: {{activeAttribute.sourceCategory}}</br>
                                     </div>
                                 </div>
                             </div>
@@ -102,19 +174,62 @@
         el: "#app",
         data(){
             return {
-                pageTitle: "Import Equipment Types from AVEVA AF",
+                pageTitle: "AVEVA AF Equipment Types Import & Export ",
                 context:<?php echo json_encode($context)?>,
+                gitContext:{
+                    org: 'ThinkIQ-Labs',
+                    repo: 'SMIP2PIAF',
+                    release: 'v0.3.0-alpha'
+                },
+                offerUpdate: false,
+                updateUrl: '',
+                updateToVersion: '',
                 afElementTemplates:[],
                 activeTemplate:null,
                 activeAttribute:null,
                 existingEquipmentTypes:[],
-                existingUoms:[]
+                existingUoms:[],
+                isImportMode: true
             }
         },
         mounted: async function(){
+            await this.checkGitVersion();
             await this.loadEquipmentTypes();
         },
         methods: {
+            checkGitVersion: async function(){
+                let aResponse = await fetch(`https://api.github.com/repos/${this.gitContext.org}/${this.gitContext.repo}/releases`);
+                let releases = await aResponse.json();
+                if(releases[0].name==this.gitContext.release){
+                    console.log(`Running version ${this.gitContext.release} - you're up to date.`);
+                } else {
+                    console.log(`Running version ${this.gitContext.release} - you should update to version ${releases[0].name}.`);
+                    this.offerUpdate = true;
+                    this.updateToVersion = releases[0].name;
+
+                    let assetsResponse = await fetch(releases[0].assets_url);
+                    let assets = await assetsResponse.json();
+                    this.updateUrl = assets[0].browser_download_url;
+
+                }
+            },
+            updateNow: async function(){
+                const apiRoute = 'index.php?option=com_thinkiq&task=invokeScript';
+                let settings = { method: 'POST', headers: {} };
+                let formData = new FormData();
+                formData.append('script_name', this.context.std_inputs.script_name + '.php');
+                formData.append('script_id', this.context.std_inputs.script_id);
+                formData.append('output_type', 1);
+                formData.append('fetch_data', true);
+                formData.append('url', this.updateUrl);
+
+                settings.body = formData;
+
+                let response = await fetch(apiRoute, settings);
+                const responseData = await response.json();
+
+                console.log(responseData.data);
+            },
             templateNeedsBaseType(aTemplate){
                 if(aTemplate.baseTemplateName==null){
                     return false;
@@ -131,6 +246,11 @@
                     returnValue = aNode.textContent;
                 }
                 return returnValue;
+            },
+            jumpToType: function(){
+                this.activeAttribute=null; 
+                this.$refs[`type_${this.activeTemplate.subTypeOf.id}`][0].scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
+                this.activeTemplate=this.existingEquipmentTypes.find(x=>x.displayName==this.activeTemplate.subTypeOf.displayName); 
             },
             importType: async function(){
                 // create type
@@ -232,9 +352,28 @@
             },
             loadEquipmentTypes: async function(){
                 let eqTypesQuery = `query q1{
-                    equipmentTypes{
+                    equipmentTypes {
                         id
                         displayName
+                        description
+                        subTypeOf {
+                            id
+                            displayName
+                        }
+                        typeToAttributeTypes {
+                            id
+                            displayName
+                            description
+                            dataType
+                            sourceCategory
+                            defaultStringValue
+                            defaultFloatValue
+                            defaultBoolValue
+                            defaultIntValue
+                            defaultMeasurementUnit {
+                                symbol
+                            }
+                        }
                     }
                     measurementUnits {
                         id
@@ -249,7 +388,11 @@
                 }
                 `;
                 let aResponse = await tiqGraphQL.makeRequestAsync(eqTypesQuery);
-                this.existingEquipmentTypes = aResponse.data.equipmentTypes;
+                let equipmentTypes = aResponse.data.equipmentTypes;
+                equipmentTypes.forEach(x=>{
+                    x.isChecked=false;
+                });
+                this.existingEquipmentTypes = equipmentTypes.sort((a,b) => a.displayName.toLowerCase() > b.displayName.toLowerCase() ? 1 : -1);
                 this.existingUoms = aResponse.data.measurementUnits;
                 this.afElementTemplates.forEach(aTemplate =>{
                     let existingType = this.existingEquipmentTypes.find(x=>x.displayName.toLowerCase()==aTemplate.name.toLowerCase());

@@ -16,7 +16,7 @@ In PI AF we have only 2 types of objects that models are based upon: elements an
 
 Even though element instances can be nested, element templates can not be nested, i.e. it is not possible to create composite types. Within an element template, however, attribute templates can be nested. For the purpose of importing AF element templates into the SMIP, we can either disregard nested attributes, or flatten them. Flattening nested attributes would preserve them for usage in the SMIP, but ultimately change the structure of the type, and possibly create issues with unique naming of sibling attributes.
 
-## Element Tamplate Meta-Data
+## Element Template Meta-Data
 
 - Name - is captured.
 - Description - is captured.

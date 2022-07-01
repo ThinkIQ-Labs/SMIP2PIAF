@@ -1,8 +1,6 @@
 # Running the Aveva Import / Export Tool from the Desktop
 
-This is a Vue+Electron App based on the process described here: [Building an app with Electron and Vue](https://blog.logrocket.com/building-app-electron-vue/).
-
-We can use almost all of the code we've written for the SM App. Only thing to add is code to pull an access token to a SMIP instance using an authenticator.
+This is a Vue+Electron App based on the process described here: [Building an app with Electron and Vue](https://blog.logrocket.com/building-app-electron-vue/). Electron let's us run a web project in a local app, natively on Windows, Linux, or Mac. This gives us the ability to act independent of a SMIP instance and communicate via the SMIP's GraphQL API using  an authenticator. We use almost all of the code we've written for the SM App.
 
 The below steps will be needed to compile this project locally on your prefered platform.
 

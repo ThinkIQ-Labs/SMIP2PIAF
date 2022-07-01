@@ -4,7 +4,7 @@ This is a Vue+Electron App based on the process described here: [Building an app
 
 ![ElectronApp Screenshot](./../images/ElectronAppScreenshot.png)
 
-The below steps will be needed to compile this project locally on your prefered platform.
+The below steps have to be taken to test and compile this project locally on your prefered platform. Make sure to change your active directory to vue-desktop.
 
 ## Project setup
 

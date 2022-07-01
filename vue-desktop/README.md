@@ -2,7 +2,7 @@
 
 This is a Vue+Electron App based on the process described here: [Building an app with Electron and Vue](https://blog.logrocket.com/building-app-electron-vue/). Electron let's us run a web project in a local app, natively on Windows, Linux, or Mac. This gives us the ability to act independent of a SMIP instance and communicate via the SMIP's GraphQL API using  an authenticator. We use almost all of the code we've written for the SM App.
 
-[ElectronApp Screenshot](./../images/ElectronAppScreenshot.png)
+![ElectronApp Screenshot](./../images/ElectronAppScreenshot.png)
 
 The below steps will be needed to compile this project locally on your prefered platform.
 
